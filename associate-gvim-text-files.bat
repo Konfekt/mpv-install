@@ -9,6 +9,9 @@ if "%1"=="/u" set unattended=yes
 :: Make sure this is Windows Vista or later
 call :ensure_vista
 
+:: Make sure the script is running as admin
+call :ensure_admin
+
 :: Command line arguments to use when launching gvim from a file association
 set gvim_args=
 
@@ -22,7 +25,7 @@ if not exist "%icon_path%" call :die "vim.ico not found"
 
 :: Register gvim.exe under the "App Paths" key, so it can be found by
 :: ShellExecute, the run command, the start menu, etc.
-set app_paths_key=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\gvim.exe
+set app_paths_key=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\gvim.exe
 call :reg add "%app_paths_key%" /d "%gvim_path%" /f
 call :reg add "%app_paths_key%" /v "UseUrl" /t REG_DWORD /d 1 /f
 
@@ -35,7 +38,7 @@ call :add_verbs "%app_key%"
 
 :: Add a capabilities key for gvim, which is registered later on for use in the
 :: "Default Programs" control panel
-set capabilities_key=HKCU\SOFTWARE\Clients\Editor\gvim\Capabilities
+set capabilities_key=HKLM\SOFTWARE\Clients\Editor\gvim\Capabilities
 call :reg add "%capabilities_key%" /v "ApplicationName" /d "gvim" /f
 call :reg add "%capabilities_key%" /v "ApplicationDescription" /d "gvim editor" /f
 
@@ -49,14 +52,40 @@ rem 	set perceived_type=%~2
 rem 	set friendly_name=%~3
 rem 	set extension=%~4
 
-call :add_type "text/plain"                        "text" "Text"                        ".txt"
-call :add_type "text/plain"                        "text" "Markdown"                    ".md" ".mkd" ".markdown"
-call :add_type "text/plain"                        "text" "Restructured Text"           ".rst"
-call :add_type "text/plain"                        "text" "INI Configuration"           ".ini"
-call :add_type "text/plain"                        "text" "Information"                 ".info"
+call :add_type "text/plain" "text" "BibTeX"              ".bib"
+call :add_type "text/plain" "text" "BibTeX Style"        ".bst"
+call :add_type "text/plain" "text" "TeX"                 ".tex"      ".latex" ".sty"        ".dtx"      ".ltx"   ".bbl"
+call :add_type "text/plain" "text" "ASCIIdoc"            ".asciidoc" ".adoc"
+call :add_type "text/plain" "text" "Text"                ".txt"
+call :add_type "text/plain" "text" "Markdown"            ".md"       ".mkd"   ".markdown"   ".markdown" ".mdown" ".mkd" ".mkdn" ".mdwn" ".md"
+call :add_type "text/plain" "text" "Restructured Text"   ".rst"
+
+call :add_type "text/plain" "text" "Log"                 ".log"
+call :add_type "text/plain" "text" "Information"         ".info"
+
+rem call :add_type "text/plain" "text" "DOS Batch"           ".bat"      ".sys"   ".cmd"
+rem call :add_type "text/plain" "text" "Visual Basic script" ".vb"       ".vbs"   ".dsm"        ".ctl"
+rem call :add_type "text/plain" "text" "Powershell script"   ".ps1"      ".psd1"  ".psm1"       ".pssc"
+call :add_type "text/plain" "text" "Vim script"          ".vim"      ".vim"   ".vba"        ".exrc"
+
+call :add_type "text/plain" "text" "Patch or Diff"       ".diff"     ".rej"   ".patch"
+
+call :add_type "text/plain" "text" "Config"              ".cfg"
+call :add_type "text/plain" "text" "INI Configuration"   ".ini"
+call :add_type "text/plain" "text" "Git Config"          ".gitconfig"
+call :add_type "text/plain" "text" "Git Config"          ".gitignore"
+call :add_type "text/plain" "text" "Git Config"          ".gitmodules"
+
+call :add_type "text/plain" "text" "HAML"                ".haml"
+call :add_type "text/plain" "text" "TOML"                ".toml"
+call :add_type "text/plain" "text" "YAML"                ".yml"      ".yaml"
+call :add_type "text/plain" "text" "JSON"                ".json"     ".jsonp"
+call :add_type "text/plain" "text" "JSON Patch"          ".json-patch"
+call :add_type "text/plain" "text" "XML"                 ".xml"
+call :add_type "text/plain" "text" "XML User Interface Language" ".xul"
 
 :: Register "Default Programs" entry
-call :reg add "HKCU\SOFTWARE\RegisteredApplications" /v "gvim" /d "SOFTWARE\Clients\Editor\gvim\Capabilities" /f
+call :reg add "HKLM\SOFTWARE\RegisteredApplications" /v "gvim" /d "SOFTWARE\Clients\Editor\gvim\Capabilities" /f
 
 echo.
 echo Installed successfully^^! You can now configure gvim's file associations in the
@@ -73,6 +102,18 @@ exit 0
 	if [%unattended%] == [yes] exit 1
 	pause
 	exit 1
+
+:ensure_admin
+	:: 'openfiles' is just a commmand that is present on all supported Windows
+	:: versions, requires admin privileges and has no side effects, see:
+	:: https://stackoverflow.com/questions/4051883/batch-script-how-to-check-for-admin-rights
+	openfiles >nul 2>&1
+	if errorlevel 1 (
+		echo This batch script requires administrator privileges. Right-click on
+		echo mpv-install.bat and select "Run as administrator".
+		call :die
+	)
+	goto :EOF
 
 :ensure_vista
 	ver | find "XP" >nul
@@ -104,12 +145,10 @@ exit 0
 :add_verbs
 	set key=%~1
 
-	:: Add "open" verb
-	call :reg add "%key%\shell\open" /d "&Open" /f
-	:: Set open command
-	call :reg add "%key%\shell\open\command" /d "\"%gvim_path%\" %gvim_args% -- \"%%%%L" /f
 	:: Set the default verb to "open"
 	call :reg add "%key%\shell" /d "open" /f
+	:: Set open command
+	call :reg add "%key%\shell\open\command" /d "\"%gvim_path%\" %gvim_args% -- \"%%%%1\"" /f
 
 	goto :EOF
 
